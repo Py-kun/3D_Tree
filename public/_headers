@@ -5,10 +5,13 @@
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
 
+<<<<<<< HEAD
 /*.js
   Content-Type: application/javascript
   Cache-Control: public, max-age=31536000, immutable
 
+=======
+>>>>>>> c009adb75737abdd1c9e8c6a65dc04ad442bee7e
 /wasm/*.wasm
   Content-Type: application/wasm
   Cross-Origin-Resource-Policy: same-origin
@@ -26,4 +29,8 @@
 /*.task
   Content-Type: application/octet-stream
   Cross-Origin-Resource-Policy: same-origin
+<<<<<<< HEAD
   Cache-Control: public, max-age=31536000, immutable
+=======
+  Cache-Control: public, max-age=31536000, immutable
+>>>>>>> c009adb75737abdd1c9e8c6a65dc04ad442bee7e
