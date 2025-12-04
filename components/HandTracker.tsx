@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { HandData } from '../types';
 import { Camera, RefreshCw, VideoOff, RotateCcw } from 'lucide-react';
+import { wasmLoader } from '../utils/wasm-loader';
+import { mediaPipeWasmAdapter } from '../utils/mediapipe-wasm-adapter';
 
 interface HandTrackerProps {
   onHandUpdate: (data: HandData) => void;
@@ -73,11 +75,72 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onHandUpdate, isEnabled }) =>
           }
         }
       };
+      // 预配置WASM环境，解决Cloudflare Pages的MIME类型问题
+      console.log('[HandTracker] 预配置WASM加载环境...');
+      
+      // 重写WASM实例化方法，确保正确处理MIME类型
+      const originalInstantiateWasm = (window as any).instantiateWasm;
+      (window as any).instantiateWasm = async (imports: any, successCallback: Function) => {
+        console.log('[HandTracker] 自定义WASM实例化钩子被调用');
+        
+        try {
+          const wasmUrl = '/wasm/vision_wasm_internal.wasm';
+          console.log(`[HandTracker] 获取WASM文件: ${wasmUrl}`);
+          
+          const response = await fetch(wasmUrl, {
+            headers: {
+              'Accept': 'application/wasm'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const contentType = response.headers.get('content-type');
+          console.log(`[HandTracker] WASM文件MIME类型: ${contentType}`);
+          
+          if (!contentType || !contentType.includes('application/wasm')) {
+            console.warn(`[HandTracker] 警告: WASM MIME类型可能不正确: ${contentType}`);
+          }
+          
+          const wasmModule = await WebAssembly.instantiateStreaming(response, imports);
+          successCallback(wasmModule.instance, wasmModule.module);
+          
+          console.log('[HandTracker] ✓ 自定义WASM实例化成功');
+          return wasmModule.instance;
+          
+        } catch (error) {
+          console.error('[HandTracker] ✗ 自定义WASM实例化失败:', error);
+          
+          // 如果流式实例化失败，尝试使用ArrayBuffer回退
+          try {
+            console.log('[HandTracker] 尝试ArrayBuffer回退方案...');
+            const wasmUrl = '/wasm/vision_wasm_internal.wasm';
+            const response = await fetch(wasmUrl);
+            const wasmBuffer = await response.arrayBuffer();
+            const wasmModule = await WebAssembly.instantiate(wasmBuffer, imports);
+            successCallback(wasmModule.instance, wasmModule.module);
+            console.log('[HandTracker] ✓ ArrayBuffer回退方案成功');
+            return wasmModule.instance;
+          } catch (fallbackError) {
+            console.error('[HandTracker] ✗ ArrayBuffer回退方案也失败:', fallbackError);
+            throw error; // 抛出原始错误
+          }
+        }
+      };
       try {
         setError(null);
         console.log('[HandTracker] 开始初始化 AI 模型...');
         console.log('[HandTracker] 浏览器信息:', navigator.userAgent);
         console.log('[HandTracker] 网络状态:', navigator.onLine ? '在线' : '离线');
+        
+        // 预加载和验证WASM文件
+        console.log('[HandTracker] 开始预加载WASM文件...');
+        const wasmValid = await wasmLoader.validateWasmFiles();
+        if (!wasmValid) {
+          throw new Error('WASM文件验证失败，请检查文件是否正确部署');
+        }
         
         // 使用本地 WASM 文件（完全本地化）
         const wasmPath = '/wasm';
@@ -85,7 +148,14 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onHandUpdate, isEnabled }) =>
         console.log('[HandTracker] 开始加载 FilesetResolver...');
         
         const visionStartTime = performance.now();
+        
+        // 获取MediaPipe WASM适配器配置
+        const wasmAdapterOptions = mediaPipeWasmAdapter.getFilesetResolverOptions();
+        console.log('[HandTracker] WASM适配器配置:', wasmAdapterOptions);
+        
+        // 为FilesetResolver配置WASM加载路径和自定义加载器
         const vision = await FilesetResolver.forVisionTasks(wasmPath);
+        
         const visionLoadTime = (performance.now() - visionStartTime) / 1000;
         console.log(`[HandTracker] ✓ WASM 运行时加载完成 (${visionLoadTime.toFixed(2)}秒)`);
         
@@ -159,11 +229,13 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onHandUpdate, isEnabled }) =>
         if (msg.includes("超时")) {
           setError("AI 模型加载超时。请刷新页面重试");
         } else if (msg.includes("fetch") || msg.includes("NetworkError")) {
-          setError("网络错误：无法加载 AI 模型，请检查网络连接");
+          setError("网络错误：无法加载 AI 模型，请检查网络连接和WASM文件路径");
         } else if (msg.includes("CORS")) {
-          setError("跨域错误：请确保网站使用 HTTPS");
+          setError("跨域错误：请确保网站使用 HTTPS 和正确的COOP/COEP头");
         } else if (msg.includes("WASM") || msg.includes("WebAssembly")) {
-          setError("浏览器不支持 WASM。请更新浏览器");
+          setError("WASM加载失败：请检查WASM文件MIME类型是否为application/wasm");
+        } else if (msg.includes("MIME") || msg.includes("MIME type")) {
+          setError("MIME类型错误：WASM文件配置不正确，请检查部署配置");
         } else {
           setError(`AI 加载失败: ${msg.slice(0, 60)}...`);
         }
