@@ -24,6 +24,13 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
+# 全局JavaScript文件MIME类型
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript"
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # HTML 文件的 CSP（允许外部字体）
 [[headers]]
   for = "/index.html"
@@ -48,9 +55,9 @@
     Cross-Origin-Resource-Policy = "same-origin"
     Cache-Control = "public, max-age=31536000, immutable"
 
-# wasm 文件夹下的所有文件（修复 HTTP/2 错误）
+# wasm 文件夹下的WASM文件
 [[headers]]
-  for = "/wasm/*"
+  for = "/wasm/*.wasm"
   [headers.values]
     Content-Type = "application/wasm"
     Cross-Origin-Resource-Policy = "same-origin"
@@ -58,7 +65,27 @@
     Accept-Ranges = "bytes"
     X-Content-Type-Options = "nosniff"
 
-# SPA 路由支持（如果需要）
+# wasm 文件夹下的JavaScript文件
+[[headers]]
+  for = "/wasm/*.js"
+  [headers.values]
+    Content-Type = "application/javascript"
+    Cross-Origin-Resource-Policy = "same-origin"
+    Cache-Control = "public, max-age=31536000, immutable"
+    Accept-Ranges = "bytes"
+    X-Content-Type-Options = "nosniff"
+
+# SPA 路由支持 - 确保测试页面可访问
+[[redirects]]
+  from = "/test-files.html"
+  to = "/test-files.html"
+  status = 200
+
+[[redirects]]
+  from = "/wasm-test.html"
+  to = "/wasm-test.html"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
