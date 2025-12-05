@@ -25,62 +25,10 @@ const HandTracker: React.FC<HandTrackerProps> = ({ onHandUpdate, isEnabled }) =>
       console.log('[HandTracker] 预配置WASM加载环境...');
       
       // 重写WASM实例化方法，确保正确处理MIME类型
-      const originalInstantiateWasm = (window as any).instantiateWasm;
-      (window as any).instantiateWasm = async (imports: any, successCallback: Function) => {
-        console.log('[HandTracker] 自定义WASM实例化钩子被调用');
-        
-        try {
-          const wasmUrl = '/wasm/vision_wasm_internal.wasm';
-          console.log(`[HandTracker] 获取WASM文件: ${wasmUrl}`);
-          
-          const response = await fetch(wasmUrl, {
-            headers: {
-              'Accept': 'application/wasm'
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          
-          const contentType = response.headers.get('content-type');
-          console.log(`[HandTracker] WASM文件MIME类型: ${contentType}`);
-          
-          if (!contentType || !contentType.includes('application/wasm')) {
-            console.warn(`[HandTracker] 警告: WASM MIME类型可能不正确: ${contentType}`);
-          }
-          
-          const wasmModule = await WebAssembly.instantiateStreaming(response, imports);
-          successCallback(wasmModule.instance, wasmModule.module);
-          
-          console.log('[HandTracker] ✓ 自定义WASM实例化成功');
-          return wasmModule.instance;
-          
-        } catch (error) {
-          console.error('[HandTracker] ✗ 自定义WASM实例化失败:', error);
-          
-          // 如果流式实例化失败，尝试使用ArrayBuffer回退
-          try {
-            console.log('[HandTracker] 尝试ArrayBuffer回退方案...');
-            const wasmUrl = '/wasm/vision_wasm_internal.wasm';
-            const response = await fetch(wasmUrl);
-            const wasmBuffer = await response.arrayBuffer();
-            const wasmModule = await WebAssembly.instantiate(wasmBuffer, imports);
-            successCallback(wasmModule.instance, wasmModule.module);
-            console.log('[HandTracker] ✓ ArrayBuffer回退方案成功');
-            return wasmModule.instance;
-          } catch (fallbackError) {
-            console.error('[HandTracker] ✗ ArrayBuffer回退方案也失败:', fallbackError);
-            throw error; // 抛出原始错误
-          }
-        }
-      };
-      // 预配置WASM环境，解决Cloudflare Pages的MIME类型问题
-      console.log('[HandTracker] 预配置WASM加载环境...');
-      
-      // 重写WASM实例化方法，确保正确处理MIME类型
-      const originalInstantiateWasm = (window as any).instantiateWasm;
-      (window as any).instantiateWasm = async (imports: any, successCallback: Function) => {
+      // @ts-ignore
+      const originalInstantiateWasm = window.instantiateWasm;
+      // @ts-ignore
+      window.instantiateWasm = async (imports: any, successCallback: Function) => {
         console.log('[HandTracker] 自定义WASM实例化钩子被调用');
         
         try {

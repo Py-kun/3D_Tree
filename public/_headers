@@ -26,8 +26,4 @@
 /*.task
   Content-Type: application/octet-stream
   Cross-Origin-Resource-Policy: same-origin
-<<<<<<< HEAD
   Cache-Control: public, max-age=31536000, immutable
-=======
-  Cache-Control: public, max-age=31536000, immutable
->>>>>>> c009adb75737abdd1c9e8c6a65dc04ad442bee7e
